@@ -60,6 +60,7 @@ export default {
 
   mounted() {
     this.setDataInterval()
+    clockUtils.updateTime()
   },
 
   beforeDestroy() {
