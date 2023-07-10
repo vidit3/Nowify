@@ -1,4 +1,7 @@
-var clock = new Vue({
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.3.4/vue.min.js"></script>
+
+<script>
+    var clock = new Vue({
     el: '#clock',
     data: {
         time: '',
@@ -22,3 +25,4 @@ function zeroPadding(num, digit) {
     }
     return (zero + num).slice(-digit);
 }
+</script>
