@@ -30,7 +30,7 @@ import * as Vibrant from 'node-vibrant'
 
 import props from '@/utils/props.js'
 
-import * from '@/utils/clockUtils.js'
+import * as ClockUtils from '@/utils/clockUtils.js'
 
 export default {
   name: 'NowPlaying',
