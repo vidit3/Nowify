@@ -28,8 +28,6 @@
 import * as Vibrant from 'node-vibrant'
 
 import props from '@/utils/props.js'
-
-import * as clockUtils from '@/utils/clockUtils.js'
   
 export default {
   name: 'NowPlaying',
@@ -62,7 +60,6 @@ export default {
 
   mounted() {
     this.setDataInterval()
-    clockUtils.updateTime()
   },
 
   beforeDestroy() {
