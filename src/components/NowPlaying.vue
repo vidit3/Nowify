@@ -20,7 +20,6 @@
     <div id="clock" v-else class="now-playing" :class="getNowPlayingClass()">
       <p class="date">{{ date }}</p>
       <p class="time">{{ time }}</p>
-      <p class="text">DIGITAL CLOCK with Vue.js</p>
     </div>
   </div>
 </template>
@@ -29,9 +28,7 @@
 import * as Vibrant from 'node-vibrant'
 
 import props from '@/utils/props.js'
-
-import * as ClockUtils from '@/utils/clockUtils.js'
-
+  
 export default {
   name: 'NowPlaying',
 
