@@ -1,0 +1,135 @@
+version: 2.1
+orbs:
+  slack: circleci/slack@4.9.3
+
+commands:
+  # Push slack error notification
+  notify_slack_error:
+    steps:
+      - slack/notify:
+          event: fail
+          template: basic_fail_1
+
+  # Push slack success notification
+  notify_slack_pass:
+    steps:
+      - slack/notify:
+          event: pass
+          template: basic_success_1
+  
+  # Deploy mule application
+  deploy_app:
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ./
+      - restore_cache:
+          key: 'circle-ci-cd-test-{{ checksum "pom.xml" }}'
+      - run:
+          name: 'Print new application version'
+          command: echo "New application version:" $(cat version.txt)
+      - run:
+          name: 'Set application version'
+          command: mvn versions:set -DnewVersion=$(cat version.txt)
+      - run:
+          name: 'Deploy application to exhcange'
+          command: mvn clean deploy -s settings.xml -Ddeployment.properties=$deployment_properties
+      - run:
+          name: 'Deploy application to runtime'
+          command: mvn deploy -DmuleDeploy -s settings.xml -Ddeployment.properties=$deployment_properties
+      - notify_slack_error
+      - notify_slack_pass
+      - persist_to_workspace:
+          root: ./
+          paths:
+            - 'target/*.jar'
+      - save_cache:
+          paths: – ~/.m2
+          key: 'circle-ci-cd-test-{{ checksum "pom.xml" }}'
+
+# Circle CI jobs
+jobs:
+  # Get bumped up version based on git commit history for branch
+  get-version:
+    machine:
+      image: 'ubuntu-2204:2022.04.2'
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: 'Pull git version image'
+          command: docker pull gittools/gitversion
+      - run:
+          name: 'Extract application version'
+          command: docker run --rm -v "$(pwd):/repo" gittools/gitversion /repo -output json -showvariable FullSemVer > version.txt
+      - store_artifacts:
+          path: version.txt
+      - persist_to_workspace:
+          root: ./
+          paths:
+            - version.txt
+  
+  # Steps for deploying to dev environment
+  deploy-dev:
+    docker:
+      - image: 'cimg/openjdk:8.0'
+    working_directory: ~/repo
+    environment:
+      deployment_properties: "ch_config/ch-dev-deployment.properties"
+    steps:
+      - deploy_app
+
+  # Steps for deploying to test environment
+  deploy-test:
+    docker:
+      - image: 'cimg/openjdk:8-jdk'
+    working_directory: ~/repo
+    environment:
+      ch_env: 'Test'
+      ch_mule_version: '4.4.0'
+      ch_app_name: 'circle-ci-cd-test-test'
+      ch_target: 'miki-travel-private-space-nonprod'
+      ch_replicas: '1'
+      ch_vcores: '1'
+      mule_env: 'test'
+    steps:
+      - deploy_app
+
+  # Publish release to github - Maintain github tags
+  publish-github-release:
+    docker:
+      - image: cibuilds/github:0.10
+    steps:
+      - attach_workspace:
+          at: ./
+      - run:
+          name: 'Publish Release to GitHub'
+          command: |
+            VERSION=$(cat version.txt)
+            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ./target/*.jar
+
+# Circle CI workflows
+workflows:
+  version: 2
+  build:
+    jobs:
+      - get-version
+      - publish-github-release:
+          requires:
+            - deploy-dev
+      - deploy-dev:
+          context: slack-secrets
+          filters:
+            branches:
+              only:
+                - dev
+          requires:
+            - get-version
+      - deploy-test:
+          context: slack-secrets
+          filters:
+            branches:
+              only:
+                - stg
+          requires:
+            - get-version
